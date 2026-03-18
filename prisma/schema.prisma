@@ -4,150 +4,457 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
 }
 
+// =====================================================
+// ENUMS
+// =====================================================
+
 enum MarketStatus {
-  ACTIVE    // Ishlayapti (To'lov qilgan)
-  INACTIVE  // Vaqtincha to'xtatilgan (O'zi o'chirgan)
-  BLOCKED   // Biz bloklaganmiz (Qoida buzgani uchun)
-  EXPIRED   // Obuna tugagan (Puli yo'q)
-  PENDING   // Yangi, hali tasdiqlanmagan
+  ACTIVE
+  INACTIVE
+  BLOCKED
+  EXPIRED
+  PENDING
 }
 
 enum Role {
   OWNER
-  STAFF
+  ADMIN
+  MANAGER
+  SELLER
 }
 
 enum UserStatus {
-  ACTIVE    // Ishlayapti
-  BLOCKED   // Bloklangan
-  EXPIRED   // Obuna tugagan (Faqat Owner uchun)
+  ACTIVE
+  BLOCKED
+  INACTIVE
+  EXPIRED
+}
+
+enum ProductStatus {
+  ACTIVE
+  INACTIVE
+  ARCHIVED
+}
+
+enum ContractStatus {
+  DRAFT
+  PENDING
+  ACTIVE
+  COMPLETED
+  CANCELLED
+  OVERDUE
+}
+
+enum InstallmentStatus {
+  PENDING
+  DUE
+  PAID
+  OVERDUE
+  PARTIAL
 }
 
 enum TransactionType {
-  DEBT      // Qarz berish
-  PAYMENT   // To'lov qabul qilish
+  PAYMENT
+  DOWNPAYMENT
+  PENALTY
+  REFUND
 }
 
+enum NotificationChannel {
+  SMS
+  TELEGRAM
+  PUSH
+}
 
+enum NotificationStatus {
+  PENDING
+  SENT
+  FAILED
+}
+
+enum NotificationReason {
+  INSTALLMENT_REMINDER
+  INSTALLMENT_DUE
+  INSTALLMENT_OVERDUE
+  CONTRACT_SIGNED
+  CONTRACT_CREATED
+  SUBSCRIPTION_EXPIRING
+}
+
+enum DocumentType {
+  PASSPORT
+  SELFIE
+  INCOME_PROOF
+  OTHER
+}
+
+// =====================================================
+// SUBSCRIPTION PLAN
+// =====================================================
 
 model SubscriptionPlan {
   id          String   @id @default(uuid()) @db.Uuid
-  name        String   @db.VarChar(50)     // "Start", "Pro"
-  duration    Int      // Kun (30, 365)
+  name        String   @db.VarChar(50)
+  duration    Int
   price       Decimal  @db.Decimal(15, 2)
-
+  description String?  @db.Text
+  isActive    Boolean  @default(true) @map("is_active")
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
-  payments    Payment[]
-  owners      User[]   // Bu tarifdan foydalanayotgan Ownerlar
+  payments Payment[]
+  owners   User[]
 
   @@map("subscription_plans")
 }
 
-model Payment {
-  id          String   @id @default(uuid()) @db.Uuid
-  userId      String   @map("user_id") @db.Uuid // Kim to'ladi? (Owner)
-  planId      String   @map("plan_id") @db.Uuid
-  amount      Decimal  @db.Decimal(10, 2)
-  startDate   DateTime @map("start_date")
-  endDate     DateTime @map("end_date")
-  createdAt   DateTime @default(now()) @map("created_at")
+// =====================================================
+// PAYMENT
+// =====================================================
 
-  user        User             @relation(fields: [userId], references: [id])
-  plan        SubscriptionPlan @relation(fields: [planId], references: [id])
+model Payment {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  planId    String   @map("plan_id") @db.Uuid
+  amount    Decimal  @db.Decimal(10, 2)
+  startDate DateTime @map("start_date")
+  endDate   DateTime @map("end_date")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User             @relation(fields: [userId], references: [id])
+  plan SubscriptionPlan @relation(fields: [planId], references: [id])
 
   @@map("payments")
 }
 
+// =====================================================
+// USER
+// =====================================================
+
 model User {
-  id           String      @id @default(uuid()) @db.Uuid
-  // Agar STAFF bo'lsa, qaysi Marketda ishlashi shart. 
-  // Agar OWNER bo'lsa, bu NULL bo'ladi (chunki uning marketlari ko'p).
-  marketId     String?     @map("market_id") @db.Uuid 
-  fullName     String      @map("full_name") @db.VarChar(100)
-  phone        String?     @unique @db.VarChar(20)
-  email        String?     @unique
-  password     String     @db.VarChar(255)
-  role         Role
-  status       UserStatus  @default(ACTIVE)
-  planId       String?     @map("plan_id") @db.Uuid // OBUNA (Faqat Owner uchun ishlatiladi)
-  subEndDate   DateTime?   @map("sub_end_date") // Obuna tugash vaqti
+  id         String     @id @default(uuid()) @db.Uuid
+  marketId   String?    @map("market_id") @db.Uuid
+  fullName   String     @map("full_name") @db.VarChar(100)
+  phone      String?    @unique @db.VarChar(20)
+  email      String?    @unique
+  password   String     @db.VarChar(255)
+  role       Role
+  status     UserStatus @default(ACTIVE)
+  planId     String?    @map("plan_id") @db.Uuid
+  subEndDate DateTime?  @map("sub_end_date")
+  createdAt  DateTime   @default(now()) @map("created_at")
+  updatedAt  DateTime   @updatedAt @map("updated_at")
 
-  createdAt    DateTime    @default(now()) @map("created_at")
-  updatedAt    DateTime    @updatedAt @map("updated_at")
+  plan       SubscriptionPlan? @relation(fields: [planId], references: [id])
+  workMarket Market?           @relation("WorkMarket", fields: [marketId], references: [id])
 
-  market       Market?     @relation("StaffMarket", fields: [marketId], references: [id]) // Staff bo'lsa
-  plan         SubscriptionPlan? @relation(fields: [planId], references: [id])
-  
-  ownerMarkets Market[]    @relation("OwnerMarkets") // Ownerning shaxsiy marketlari
+  ownerMarkets Market[]      @relation("OwnerMarkets")
   payments     Payment[]
+  contracts    Contract[]
   transactions Transaction[]
 
   @@map("users")
 }
 
-model Market {
-  id           String        @id @default(uuid()) @db.Uuid
-  ownerId      String        @map("owner_id") @db.Uuid
-  name         String        @db.VarChar(100) 
-  address      String?        @db.VarChar(255) 
+// =====================================================
+// MARKET
+// =====================================================
 
-  createdAt    DateTime      @default(now()) @map("created_at")
-  updatedAt    DateTime      @updatedAt @map("updated_at")
-  
-  owner        User          @relation("OwnerMarkets", fields: [ownerId], references: [id])
-  staffs       User[]        @relation("StaffMarket") 
-  
-  customers    Customer[]
-  transactions Transaction[]
+model Market {
+  id        String       @id @default(uuid()) @db.Uuid
+  ownerId   String       @map("owner_id") @db.Uuid
+  name      String       @db.VarChar(100)
+  address   String?      @db.VarChar(255)
+  phone     String?      @db.VarChar(20)
+  status    MarketStatus @default(PENDING)
+  createdAt DateTime     @default(now()) @map("created_at")
+  updatedAt DateTime     @updatedAt @map("updated_at")
+
+  owner   User   @relation("OwnerMarkets", fields: [ownerId], references: [id])
+  workers User[] @relation("WorkMarket")
+
+  categories Category[]
+  products   Product[]
+  customers  Customer[]
+  contracts  Contract[]
 
   @@map("markets")
 }
 
+// =====================================================
+// CATEGORY
+// =====================================================
+
+model Category {
+  id        String   @id @default(uuid()) @db.Uuid
+  marketId  String   @map("market_id") @db.Uuid
+  name      String   @db.VarChar(100)
+  imageUrl  String?  @map("image_url") @db.Text
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  market   Market    @relation(fields: [marketId], references: [id])
+  products Product[]
+
+  @@unique([marketId, name])
+  @@map("categories")
+}
+
+// =====================================================
+// PRODUCT
+// =====================================================
+
+model Product {
+  id          String        @id @default(uuid()) @db.Uuid
+  marketId    String        @map("market_id") @db.Uuid
+  categoryId  String        @map("category_id") @db.Uuid
+  name        String        @db.VarChar(200)
+  description String?       @db.Text
+  imageUrl    String?       @map("image_url") @db.Text
+  stock       Int           @default(0)
+  basePrice   Decimal       @map("base_price") @db.Decimal(15, 2)
+  status      ProductStatus @default(ACTIVE)
+  createdAt   DateTime      @default(now()) @map("created_at")
+  updatedAt   DateTime      @updatedAt @map("updated_at")
+
+  market        Market             @relation(fields: [marketId], references: [id])
+  category      Category           @relation(fields: [categoryId], references: [id])
+  pricePlans    ProductPricePlan[]
+  contractItems ContractItem[]
+
+  @@index([marketId])
+  @@index([categoryId])
+  @@map("products")
+}
+
+// =====================================================
+// PRODUCT PRICE PLAN
+// =====================================================
+
+model ProductPricePlan {
+  id           String  @id @default(uuid()) @db.Uuid
+  productId    String  @map("product_id") @db.Uuid
+  termMonths   Int     @map("term_months")
+  interestRate Decimal @map("interest_rate") @db.Decimal(5, 2)
+  totalPrice   Decimal @map("total_price") @db.Decimal(15, 2)
+  monthlyPrice Decimal @map("monthly_price") @db.Decimal(15, 2)
+
+  product       Product        @relation(fields: [productId], references: [id])
+  contractItems ContractItem[]
+
+  @@unique([productId, termMonths])
+  @@map("product_price_plans")
+}
+
+// =====================================================
+// CUSTOMER
+// =====================================================
+
 model Customer {
-  id           String        @id @default(uuid()) @db.Uuid
-  marketId     String        @map("market_id") @db.Uuid 
-  fullName     String        @map("full_name") @db.VarChar(100)
-  phone        String        @db.VarChar(20)
-  createdAt    DateTime      @default(now()) @map("created_at")
-  updatedAt    DateTime      @updatedAt @map("updated_at")
+  id            String    @id @default(uuid()) @db.Uuid
+  marketId      String    @map("market_id") @db.Uuid
+  fullName      String    @map("full_name") @db.VarChar(100)
+  phone         String    @db.VarChar(20)
+  address       String?   @db.VarChar(255)
+  passportSeria String?   @map("passport_seria") @db.VarChar(20)
+  birthDate     DateTime? @map("birth_date")
+  note          String?   @db.Text
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
 
-  market       Market        @relation(fields: [marketId], references: [id])
-  balance      Balance?
-  transactions Transaction[]
+  market        Market         @relation(fields: [marketId], references: [id])
+  contracts     Contract[]
+  notifications Notification[]
+  documents     Document[]
 
+  @@unique([marketId, phone])
+  @@index([marketId])
   @@map("customers")
 }
 
-model Balance {
-  id           String   @id @default(uuid()) @db.Uuid
-  customerId   String   @unique @map("customer_id") @db.Uuid
-  amount       Decimal  @default(0) @db.Decimal(15, 2)
-  createdAt    DateTime @default(now()) @map("created_at")
-  updatedAt    DateTime @updatedAt @map("updated_at")
+// =====================================================
+// CONTRACT
+// =====================================================
 
-  customer     Customer @relation(fields: [customerId], references: [id])
+model Contract {
+  id             String @id @default(uuid()) @db.Uuid
+  contractNumber String @unique @map("contract_number")
+  marketId       String @map("market_id") @db.Uuid
+  customerId     String @map("customer_id") @db.Uuid
+  staffId        String @map("staff_id") @db.Uuid
 
-  @@map("balances")
+  termMonths    Int     @map("term_months")
+  downPayment   Decimal @default(0) @map("down_payment") @db.Decimal(15, 2)
+  totalAmount   Decimal @map("total_amount") @db.Decimal(15, 2)
+  monthlyAmount Decimal @map("monthly_amount") @db.Decimal(15, 2)
+  paidAmount    Decimal @default(0) @map("paid_amount") @db.Decimal(15, 2)
+  remainAmount  Decimal @map("remain_amount") @db.Decimal(15, 2)
+
+  startDate DateTime @map("start_date")
+  endDate   DateTime @map("end_date")
+
+  status ContractStatus @default(DRAFT)
+  note   String?        @db.Text
+
+  signToken       String?   @unique @map("sign_token") @db.VarChar(100)
+  signTokenExpiry DateTime? @map("sign_token_expiry")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  market        Market         @relation(fields: [marketId], references: [id])
+  customer      Customer       @relation(fields: [customerId], references: [id])
+  staff         User           @relation(fields: [staffId], references: [id])
+  items         ContractItem[]
+  installments  Installment[]
+  transactions  Transaction[]
+  signature     Signature?
+  notifications Notification[]
+
+  @@index([marketId])
+  @@index([customerId])
+  @@index([status])
+  @@map("contracts")
 }
 
+// =====================================================
+// CONTRACT ITEM
+// =====================================================
+
+model ContractItem {
+  id          String @id @default(uuid()) @db.Uuid
+  contractId  String @map("contract_id") @db.Uuid
+  productId   String @map("product_id") @db.Uuid
+  pricePlanId String @map("price_plan_id") @db.Uuid
+
+  productName  String  @map("product_name") @db.VarChar(200)
+  quantity     Int     @default(1)
+  basePrice    Decimal @map("base_price") @db.Decimal(15, 2)
+  interestRate Decimal @map("interest_rate") @db.Decimal(5, 2)
+  totalPrice   Decimal @map("total_price") @db.Decimal(15, 2)
+  monthlyPrice Decimal @map("monthly_price") @db.Decimal(15, 2)
+
+  contract  Contract         @relation(fields: [contractId], references: [id])
+  product   Product          @relation(fields: [productId], references: [id])
+  pricePlan ProductPricePlan @relation(fields: [pricePlanId], references: [id])
+
+  @@map("contract_items")
+}
+
+// =====================================================
+// INSTALLMENT
+// =====================================================
+
+model Installment {
+  id         String            @id @default(uuid()) @db.Uuid
+  contractId String            @map("contract_id") @db.Uuid
+  orderIndex Int               @map("order_index")
+  dueDate    DateTime          @map("due_date")
+  amount     Decimal           @db.Decimal(15, 2)
+  paidAmount Decimal           @default(0) @map("paid_amount") @db.Decimal(15, 2)
+  status     InstallmentStatus @default(PENDING)
+  paidAt     DateTime?         @map("paid_at")
+  createdAt  DateTime          @default(now()) @map("created_at")
+  updatedAt  DateTime          @updatedAt @map("updated_at")
+
+  contract      Contract       @relation(fields: [contractId], references: [id])
+  transactions  Transaction[]
+  notifications Notification[]
+
+  @@index([contractId])
+  @@index([dueDate])
+  @@index([status])
+  @@map("installments")
+}
+
+// =====================================================
+// TRANSACTION
+// =====================================================
+
 model Transaction {
-  id           String          @id @default(uuid()) @db.Uuid
-  marketId     String          @map("market_id") @db.Uuid
-  userId       String          @map("user_id") @db.Uuid // Kim bajardi (Staff yoki Owner)
-  customerId   String          @map("customer_id") @db.Uuid
-  type         TransactionType
-  amount       Decimal         @db.Decimal(15, 2)
-  description  String?         @db.Text
-  createdAt    DateTime        @default(now()) @map("created_at")
+  id            String          @id @default(uuid()) @db.Uuid
+  contractId    String          @map("contract_id") @db.Uuid
+  installmentId String?         @map("installment_id") @db.Uuid
+  staffId       String          @map("staff_id") @db.Uuid
+  type          TransactionType
+  amount        Decimal         @db.Decimal(15, 2)
+  note          String?         @db.Text
+  createdAt     DateTime        @default(now()) @map("created_at")
 
-  market       Market          @relation(fields: [marketId], references: [id])
-  user         User            @relation(fields: [userId], references: [id])
-  customer     Customer        @relation(fields: [customerId], references: [id])
+  contract    Contract     @relation(fields: [contractId], references: [id])
+  installment Installment? @relation(fields: [installmentId], references: [id])
+  staff       User         @relation(fields: [staffId], references: [id])
 
+  @@index([contractId])
+  @@index([createdAt])
   @@map("transactions")
+}
+
+// =====================================================
+// SIGNATURE
+// =====================================================
+
+model Signature {
+  id           String   @id @default(uuid()) @db.Uuid
+  contractId   String   @unique @map("contract_id") @db.Uuid
+  signatureUrl String   @map("signature_url") @db.Text
+  ipAddress    String?  @map("ip_address") @db.VarChar(45)
+  userAgent    String?  @map("user_agent") @db.Text
+  signedAt     DateTime @map("signed_at")
+
+  contract Contract @relation(fields: [contractId], references: [id])
+
+  @@map("signatures")
+}
+
+// =====================================================
+// NOTIFICATION
+// =====================================================
+
+model Notification {
+  id            String              @id @default(uuid()) @db.Uuid
+  customerId    String              @map("customer_id") @db.Uuid
+  contractId    String?             @map("contract_id") @db.Uuid
+  installmentId String?             @map("installment_id") @db.Uuid
+  channel       NotificationChannel
+  reason        NotificationReason
+  status        NotificationStatus  @default(PENDING)
+  message       String              @db.Text
+  sentAt        DateTime?           @map("sent_at")
+  error         String?             @db.Text
+  createdAt     DateTime            @default(now()) @map("created_at")
+
+  customer    Customer     @relation(fields: [customerId], references: [id])
+  contract    Contract?    @relation(fields: [contractId], references: [id])
+  installment Installment? @relation(fields: [installmentId], references: [id])
+
+  @@index([customerId])
+  @@index([contractId])
+  @@index([installmentId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("notifications")
+}
+
+// =====================================================
+// DOCUMENT
+// =====================================================
+
+model Document {
+  id           String       @id @default(uuid()) @db.Uuid
+  customerId   String       @map("customer_id") @db.Uuid
+  type         DocumentType
+  fileName     String       @map("file_name") @db.VarChar(255)
+  fileUrl      String       @map("file_url") @db.Text
+  fileSize     Int?         @map("file_size")
+  mimeType     String?      @map("mime_type") @db.VarChar(100)
+  uploadedById String       @map("uploaded_by_id") @db.Uuid
+  createdAt    DateTime     @default(now()) @map("created_at")
+
+  customer Customer @relation(fields: [customerId], references: [id])
+
+  @@index([customerId])
+  @@map("documents")
 }
