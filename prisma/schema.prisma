@@ -1,9 +1,11 @@
 generator client {
   provider = "prisma-client-js"
+  output   = "../node_modules/.prisma/client"
 }
 
 datasource db {
   provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
 // =====================================================
@@ -138,7 +140,7 @@ model User {
   marketId   String?    @map("market_id") @db.Uuid
   fullName   String     @map("full_name") @db.VarChar(100)
   phone      String?    @unique @db.VarChar(20)
-  email      String?    @unique
+  email      String     @unique
   password   String     @db.VarChar(255)
   role       Role
   status     UserStatus @default(ACTIVE)
