@@ -1,49 +1,44 @@
-import 'dotenv/config';
-import { ValidationPipe } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
-import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
-import { API_PREFIX, SWAGGER_PATH } from './common/constants/api.constants';
-import { GlobalExceptionFilter } from './common/exceptions/global-exception.filter';
+import { ValidationPipe } from '@nestjs/common';
+import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
-  const configService = app.get(ConfigService);
-
-  app.enableCors({
-    origin: true,
-    credentials: true,
-  });
-
-  app.setGlobalPrefix(API_PREFIX);
-
-  app.useGlobalFilters(new GlobalExceptionFilter());
 
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
       forbidNonWhitelisted: true,
-      transform: true,
-      transformOptions: {
-        enableImplicitConversion: true,
-      },
     }),
   );
 
+  app.setGlobalPrefix('api');
+
+  // Swagger
   const config = new DocumentBuilder()
     .setTitle('Balance API')
-    .setDescription('Nasiya va market boshqaruvi uchun API')
+    .setDescription("Bo'lib to'lash boshqaruv tizimi API")
     .setVersion('1.0')
-    .addBearerAuth()
+    .addBearerAuth(
+      {
+        type: 'http',
+        scheme: 'bearer',
+        bearerFormat: 'JWT',
+        name: 'Authorization',
+        in: 'header',
+      },
+      'access-token',
+    )
     .build();
 
   const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup(SWAGGER_PATH, app, document);
+  SwaggerModule.setup('api/docs', app, document);
 
-  const port = configService.get<number>('app.port', 3000);
-
-  await app.listen(port);
+  await app.listen(process.env.PORT ?? 3000);
 }
 
-void bootstrap();
+bootstrap().catch((error: unknown) => {
+  console.error('Bootstrap error:', error);
+  process.exit(1);
+});
