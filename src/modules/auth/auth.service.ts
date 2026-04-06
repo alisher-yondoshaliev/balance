@@ -177,6 +177,28 @@ export class AuthService {
       throw new UnauthorizedException("Email yoki parol noto'g'ri");
     }
 
+    // Market tekshirish
+    let responseMarketId = user.marketId;
+
+    if (user.role === 'OWNER') {
+      // OWNER uchun birinchi do'konini topish
+      if (!user.marketId) {
+        const ownerMarket = await this.prisma.market.findFirst({
+          where: { ownerId: user.id },
+          select: { id: true },
+          orderBy: { createdAt: 'asc' },
+        });
+        responseMarketId = ownerMarket?.id || null;
+      }
+    } else {
+      // ADMIN, MANAGER, SELLER uchun market majburi
+      if (!user.marketId) {
+        throw new BadRequestException(
+          "Siz biror do'konning xodimi emasiz. Administrator bilan bog'laning",
+        );
+      }
+    }
+
     const tokens = await this.generateTokens(user.id, user.email, user.role);
 
     return {
@@ -185,7 +207,7 @@ export class AuthService {
         fullName: user.fullName,
         email: user.email,
         role: user.role,
-        marketId: user.marketId,
+        marketId: responseMarketId,
       },
       ...tokens,
     };

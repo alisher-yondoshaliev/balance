@@ -7,6 +7,10 @@ import { MarketsModule } from './modules/markets/markets.module';
 import { UsersModule } from './modules/users/users.module';
 import { CustomersModule } from './modules/customers/customers.module';
 import { SubscriptionsModule } from './modules/subscriptions/subscriptions.module';
+import { ContractsModule } from './modules/contracts/contracts.module';
+import { CategoriesModule } from './modules/categories/categories.module';
+import { ProductsModule } from './modules/products/products.module';
+import { DashboardModule } from './modules/dashboard/dashboard.module';
 
 @Module({
   imports: [
@@ -21,6 +25,10 @@ import { SubscriptionsModule } from './modules/subscriptions/subscriptions.modul
     UsersModule,
     CustomersModule,
     SubscriptionsModule,
+    ContractsModule,
+    CategoriesModule,
+    ProductsModule,
+    DashboardModule,
   ],
 })
 export class AppModule {}
