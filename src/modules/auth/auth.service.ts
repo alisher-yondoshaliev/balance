@@ -23,7 +23,7 @@ export class AuthService {
     private jwtService: JwtService,
     private configService: ConfigService,
     private mailService: MailService,
-  ) {}
+  ) { }
 
   // ── 1. OTP yuborish (faqat register uchun) ─────────
   async sendOtp(dto: SendOtpDto) {
@@ -177,28 +177,6 @@ export class AuthService {
       throw new UnauthorizedException("Email yoki parol noto'g'ri");
     }
 
-    // Market tekshirish
-    let responseMarketId = user.marketId;
-
-    if (user.role === 'OWNER') {
-      // OWNER uchun birinchi do'konini topish
-      if (!user.marketId) {
-        const ownerMarket = await this.prisma.market.findFirst({
-          where: { ownerId: user.id },
-          select: { id: true },
-          orderBy: { createdAt: 'asc' },
-        });
-        responseMarketId = ownerMarket?.id || null;
-      }
-    } else {
-      // ADMIN, MANAGER, SELLER uchun market majburi
-      if (!user.marketId) {
-        throw new BadRequestException(
-          "Siz biror do'konning xodimi emasiz. Administrator bilan bog'laning",
-        );
-      }
-    }
-
     const tokens = await this.generateTokens(user.id, user.email, user.role);
 
     return {
@@ -207,7 +185,7 @@ export class AuthService {
         fullName: user.fullName,
         email: user.email,
         role: user.role,
-        marketId: responseMarketId,
+        marketId: user.marketId,
       },
       ...tokens,
     };
@@ -228,22 +206,6 @@ export class AuthService {
     }
 
     return this.generateTokens(user.id, user.email, user.role);
-  }
-
-  // ── 6. Me ──────────────────────────────────────────
-  async getMe(userId: string) {
-    // Use raw SQL to bypass Prisma enum validation
-    const rows = await this.prisma.$queryRawUnsafe<any[]>(
-      `SELECT id, full_name as "fullName", email, phone, role, status, market_id as "marketId", sub_end_date as "subEndDate", created_at as "createdAt"
-       FROM users WHERE id = $1::uuid LIMIT 1`,
-      userId,
-    );
-
-    if (!rows || rows.length === 0) {
-      throw new UnauthorizedException('User topilmadi');
-    }
-
-    return rows[0];
   }
 
   // ── 7. Change Password ─────────────────────────────
@@ -325,15 +287,21 @@ export class AuthService {
 
     const tokens = await this.generateTokens(user.id, user.email, user.role);
 
-    return {
+    const response: any = {
       user: {
         id: user.id,
         fullName: user.fullName,
         email: user.email,
         role: user.role,
-        marketId: user.marketId,
       },
       ...tokens,
     };
+
+    // ✅ Only include marketId if present (OWNER may not have market yet, never for new Google users)
+    if (user.marketId) {
+      response.user.marketId = user.marketId;
+    }
+
+    return response;
   }
 }

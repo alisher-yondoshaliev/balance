@@ -8,27 +8,16 @@ import {
   Post,
   UseGuards,
 } from '@nestjs/common';
-import {
-  ApiTags,
-  ApiOperation,
-  ApiBearerAuth,
-  ApiProperty,
-} from '@nestjs/swagger';
-import { IsEnum } from 'class-validator';
+import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { UpdateUserStatusDto } from './dto/update-status.dto';
 import { AccessTokenGuard } from '../auth/guards/access-token.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
-import { Role, User, UserStatus } from '@prisma/client';
-
-class UpdateStatusDto {
-  @ApiProperty({ enum: UserStatus })
-  @IsEnum(UserStatus)
-  status!: UserStatus;
-}
+import { Role, User } from '@prisma/client';
 
 @ApiTags('Users')
 @ApiBearerAuth('access-token')
@@ -87,7 +76,7 @@ export class UsersController {
   @ApiOperation({ summary: "User statusini o'zgartirish" })
   updateStatus(
     @Param('id') id: string,
-    @Body() dto: UpdateStatusDto,
+    @Body() dto: UpdateUserStatusDto,
     @CurrentUser() currentUser: User,
   ) {
     return this.usersService.updateStatus(id, dto.status, currentUser);

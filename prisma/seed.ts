@@ -27,12 +27,18 @@ async function main() {
 
     const hashedPassword = await bcrypt.hash('Admin123!', 10);
 
-    // Raw SQL bilan yaratish
+    // Parameterized query bilan yaratish (SQL injection dan xavfsiz)
     const userId = 'f2f2f249-d598-4a6d-93b6-f81801b1073b';
     await prisma.$executeRawUnsafe(
         `INSERT INTO users 
         (id, full_name, email, password, role, status, created_at, updated_at) 
-        VALUES ('${userId}', 'Super Admin', 'admin@gmail.com', '${hashedPassword}', 'SUPERADMIN', 'ACTIVE', NOW(), NOW())`
+        VALUES ($1::uuid, $2, $3, $4, $5, $6, NOW(), NOW())`,
+        userId,
+        'Super Admin',
+        'admin@gmail.com',
+        hashedPassword,
+        'SUPERADMIN',
+        'ACTIVE'
     );
 
     console.log('SuperAdmin yaratildi: admin@gmail.com');

@@ -21,22 +21,14 @@ import { AccessTokenGuard } from '../auth/guards/access-token.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
-import { User, Role, MarketStatus } from '@prisma/client';
-import { IsEnum } from 'class-validator';
-import { ApiProperty } from '@nestjs/swagger';
-
-class UpdateStatusDto {
-  @ApiProperty({ enum: MarketStatus })
-  @IsEnum(MarketStatus)
-  status!: MarketStatus;
-}
+import { Role } from '@prisma/client';
 
 @ApiTags('Markets')
 @ApiBearerAuth('access-token')
 @UseGuards(AccessTokenGuard)
 @Controller('markets')
 export class MarketsController {
-  constructor(private marketsService: MarketsService) {}
+  constructor(private marketsService: MarketsService) { }
 
   @Post()
   @UseGuards(RolesGuard)
@@ -57,8 +49,8 @@ export class MarketsController {
 
   @Get(':id')
   @ApiOperation({ summary: "Bitta do'kon" })
-  findOne(@Param('id') id: string, @CurrentUser() user: User) {
-    return this.marketsService.findOne(id, user);
+  findOne(@Param('id') id: string) {
+    return this.marketsService.findOne(id);
   }
 
   @Patch(':id')
@@ -79,13 +71,5 @@ export class MarketsController {
   @ApiOperation({ summary: "Do'kon o'chirish" })
   remove(@Param('id') id: string, @CurrentUser('id') userId: string) {
     return this.marketsService.remove(id, userId);
-  }
-
-  @Patch(':id/status')
-  @UseGuards(RolesGuard)
-  @Roles(Role.ADMIN)
-  @ApiOperation({ summary: "Do'kon holatini o'zgartirish (Admin)" })
-  updateStatus(@Param('id') id: string, @Body() dto: UpdateStatusDto) {
-    return this.marketsService.updateStatus(id, dto.status);
   }
 }

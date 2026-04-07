@@ -10,7 +10,7 @@ import { MarketStatus, User } from '@prisma/client';
 
 @Injectable()
 export class MarketsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService) { }
 
   // ── 1. Do'kon yaratish ─────────────────────────────
   async create(dto: CreateMarketDto, userId: string) {
@@ -46,8 +46,8 @@ export class MarketsService {
   }
 
   // ── 3. Bitta do'kon ────────────────────────────────
-  async findOne(id: string, user: User) {
-    const market = await this.prisma.market.findUnique({
+  async findOne(id: string) {
+    return await this.prisma.market.findUnique({
       where: { id },
       include: {
         owner: {
@@ -55,28 +55,10 @@ export class MarketsService {
             id: true,
             fullName: true,
             email: true,
-            phone: true,
-          },
-        },
-        _count: {
-          select: {
-            workers: true,
-            products: true,
-            customers: true,
-            contracts: true,
           },
         },
       },
     });
-
-    if (!market) throw new NotFoundException("Do'kon topilmadi");
-
-    // Faqat owner o'z do'konini ko'ra oladi
-    if (market.ownerId !== user.id && user.role !== 'ADMIN') {
-      throw new ForbiddenException("Bu do'konga ruxsat yo'q");
-    }
-
-    return market;
   }
 
   // ── 4. Do'kon tahrirlash ───────────────────────────
@@ -99,7 +81,7 @@ export class MarketsService {
     });
   }
 
-  // ── 5. Do'kon o'chirish u2500───────────────────────────
+  // ── 5. Do'kon o'chirish ───────────────────────────
   async remove(id: string, userId: string) {
     const market = await this.prisma.market.findUnique({ where: { id } });
 
@@ -112,17 +94,5 @@ export class MarketsService {
     await this.prisma.market.delete({ where: { id } });
 
     return { message: "Do'kon muvaffaqiyatli o'chirildi" };
-  }
-
-  // ── 6. Holat o'zgartirish (Admin) ──────────────────
-  async updateStatus(id: string, status: MarketStatus) {
-    const market = await this.prisma.market.findUnique({ where: { id } });
-
-    if (!market) throw new NotFoundException("Do'kon topilmadi");
-
-    return this.prisma.market.update({
-      where: { id },
-      data: { status },
-    });
   }
 }

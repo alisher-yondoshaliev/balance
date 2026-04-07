@@ -14,24 +14,17 @@ import {
   ApiOperation,
   ApiBearerAuth,
   ApiQuery,
-  ApiProperty,
 } from '@nestjs/swagger';
-import { IsEnum } from 'class-validator';
 import { ProductsService } from './products.service';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
+import { UpdateProductStatusDto } from './dto/update-status.dto';
 import { CreatePricePlanDto } from './dto/create-price-plan.dto';
 import { AccessTokenGuard } from '../auth/guards/access-token.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
-import { ProductStatus, Role, User } from '@prisma/client';
-
-class UpdateStatusDto {
-  @ApiProperty({ enum: ProductStatus })
-  @IsEnum(ProductStatus)
-  status: ProductStatus = 'ACTIVE';
-}
+import { Role, User } from '@prisma/client';
 
 @ApiTags('Products')
 @ApiBearerAuth('access-token')
@@ -78,7 +71,7 @@ export class ProductsController {
   @ApiOperation({ summary: "Mahsulot statusini o'zgartirish" })
   updateStatus(
     @Param('id') id: string,
-    @Body() dto: UpdateStatusDto,
+    @Body() dto: UpdateProductStatusDto,
     @CurrentUser() user: User,
   ) {
     return this.productsService.updateStatus(id, dto.status, user);

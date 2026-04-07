@@ -6,6 +6,7 @@ import {
   Patch,
   UseGuards,
   Req,
+  Res,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -13,7 +14,7 @@ import {
   ApiResponse,
   ApiBearerAuth,
 } from '@nestjs/swagger';
-import type { Request } from 'express';
+import type { Request, Response } from 'express';
 import { AuthService } from './auth.service';
 import { SendOtpDto } from './dto/send-otp.dto';
 import { VerifyOtpDto } from './dto/verify-otp.dto';
@@ -28,7 +29,7 @@ import { GoogleGuard } from './guards/google.guard';
 @ApiTags('Auth')
 @Controller('auth')
 export class AuthController {
-  constructor(private authService: AuthService) {}
+  constructor(private authService: AuthService) { }
 
   @Post('send-otp')
   @ApiOperation({ summary: 'Emailga OTP yuborish (register uchun)' })
@@ -77,14 +78,6 @@ export class AuthController {
     return this.authService.refresh(user.sub);
   }
 
-  @Get('me')
-  @UseGuards(AccessTokenGuard)
-  @ApiBearerAuth('access-token')
-  @ApiOperation({ summary: "Joriy foydalanuvchi ma'lumotlari" })
-  getMe(@CurrentUser('id') userId: string) {
-    return this.authService.getMe(userId);
-  }
-
   @Get('google')
   @UseGuards(GoogleGuard)
   @ApiOperation({ summary: 'Google orqali kirish' })
@@ -95,13 +88,19 @@ export class AuthController {
   @Get('google/callback')
   @UseGuards(GoogleGuard)
   @ApiOperation({ summary: 'Google callback' })
-  googleCallback(@Req() req: Request) {
+  async googleCallback(@Req() req: Request, @Res() res: Response) {
     const googleUser = req.user as {
       email: string;
       fullName: string;
       picture: string;
     };
-    return this.authService.googleAuth(googleUser);
+    const result = await this.authService.googleAuth(googleUser);
+
+    // Frontend'ga token'larni query parameter bilan yo'naltirish
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+    const redirectUrl = `${frontendUrl}/auth/google/callback?accessToken=${result.accessToken}&refreshToken=${result.refreshToken}&user=${encodeURIComponent(JSON.stringify(result.user))}`;
+
+    res.redirect(redirectUrl);
   }
 
   @Patch('change-password')

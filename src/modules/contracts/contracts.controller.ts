@@ -14,24 +14,17 @@ import {
   ApiOperation,
   ApiBearerAuth,
   ApiQuery,
-  ApiProperty,
 } from '@nestjs/swagger';
-import { IsEnum } from 'class-validator';
 import { ContractsService } from './contracts.service';
 import { CreateContractDto } from './dto/create-contract.dto';
 import { UpdateContractDto } from './dto/update-contract.dto';
+import { UpdateContractStatusDto } from './dto/update-status.dto';
 import { PayInstallmentDto } from './dto/pay-installment.dto';
 import { AccessTokenGuard } from '../auth/guards/access-token.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
-import { ContractStatus, Role, User } from '@prisma/client';
-
-class UpdateStatusDto {
-  @ApiProperty({ enum: ContractStatus })
-  @IsEnum(ContractStatus)
-  status: ContractStatus = 'DRAFT';
-}
+import { Role, User } from '@prisma/client';
 
 @ApiTags('Contracts')
 @ApiBearerAuth('access-token')
@@ -88,7 +81,7 @@ export class ContractsController {
   @ApiOperation({ summary: "Shartnoma statusini o'zgartirish" })
   updateStatus(
     @Param('id') id: string,
-    @Body() dto: UpdateStatusDto,
+    @Body() dto: UpdateContractStatusDto,
     @CurrentUser() currentUser: User,
   ) {
     return this.contractsService.updateStatus(id, dto.status, currentUser);
