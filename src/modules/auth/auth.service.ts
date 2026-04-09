@@ -25,7 +25,7 @@ export class AuthService {
     private jwtService: JwtService,
     private configService: ConfigService,
     private mailService: MailService,
-  ) { }
+  ) {}
 
   // ── 1. OTP yuborish (register yoki forgot password uchun) ────────
   async sendOtp(dto: SendOtpDto) {

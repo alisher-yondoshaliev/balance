@@ -1,8 +1,10 @@
 import { NestFactory } from '@nestjs/core';
-import { ValidationPipe, Logger } from '@nestjs/common';
+import { ValidationPipe, Logger, BadRequestException } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 import * as net from 'net';
+import * as path from 'path';
+import * as fs from 'fs/promises';
 
 const logger = new Logger('NestApplication');
 
@@ -43,6 +45,15 @@ async function findAvailablePort(startPort: number = 3000): Promise<number> {
 }
 
 async function bootstrap() {
+  // Create uploads directories if they don't exist
+  try {
+    const uploadsDir = path.join(process.cwd(), 'uploads', 'categories');
+    await fs.mkdir(uploadsDir, { recursive: true });
+    logger.debug(`✓ Uploads directory ready: ${uploadsDir}`);
+  } catch (error) {
+    logger.error('Uploads directory creation failed:', error);
+  }
+
   // Environment orqali port (default 3000)
   const defaultPort = parseInt(process.env.PORT ?? '3000', 10);
 
@@ -66,10 +77,62 @@ async function bootstrap() {
     allowedHeaders: ['Content-Type', 'Authorization'],
   });
 
+  // Serve static files from uploads directory
+  const express = await import('express');
+  app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
+
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
       forbidNonWhitelisted: true,
+      transform: true,
+      transformOptions: { enableImplicitConversion: true },
+      exceptionFactory: (errors) => {
+        const messages: Record<string, string> = {};
+
+        errors.forEach((error) => {
+          if (error.property) {
+            // Property xatolari (ruxsat berilmagan fieldlar)
+            if (error.constraints && error.constraints['isUuid']) {
+              messages[error.property] =
+                `${error.property} togri UUID formatda bo'lishi kerak`;
+            } else if (error.constraints && error.constraints['isString']) {
+              messages[error.property] =
+                `${error.property} matn bo'lishi kerak`;
+            } else if (error.constraints && error.constraints['minLength']) {
+              messages[error.property] =
+                `${error.property} "${error.constraints['minLength']}" ta belgidan kam bo'lmasligi kerak`;
+            } else if (error.constraints && error.constraints['maxLength']) {
+              messages[error.property] =
+                `${error.property} "${error.constraints['maxLength']}" ta belgidan ortiq bo'lmasligi kerak`;
+            } else if (error.constraints && error.constraints['isEmail']) {
+              messages[error.property] =
+                `${error.property} tog'ri email bo'lishi kerak`;
+            } else if (error.constraints && error.constraints['isNotEmpty']) {
+              messages[error.property] =
+                `${error.property} bo'sh bo'lmasligi kerak`;
+            } else if (
+              (error.constraints && error.constraints['whitelistValidation']) ||
+              error.property.includes('should_not_exist')
+            ) {
+              // DTO'da yo'q bo'lgan fieldlar
+              messages[error.property] =
+                `${error.property} kiritilmasligi kerak`;
+            } else if (error.constraints) {
+              // Boshqa xatolar
+              messages[error.property] = Object.values(
+                error.constraints,
+              )[0] as string;
+            }
+          }
+        });
+
+        return new BadRequestException({
+          statusCode: 400,
+          message: 'Validatsiya xatosi',
+          errors: messages,
+        });
+      },
     }),
   );
 

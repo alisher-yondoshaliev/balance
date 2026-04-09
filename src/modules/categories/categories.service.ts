@@ -26,11 +26,23 @@ export class CategoriesService {
     return market;
   }
 
-  async findAll(marketId: string, currentUser: User) {
+  async findAll(marketId: string, currentUser: User, search?: string) {
     await this.checkMarketAccess(marketId, currentUser);
+
+    // Build where conditions
+    const where: any = { marketId };
+    if (search && search.trim()) {
+      where.name = {
+        contains: search.trim(),
+        mode: 'insensitive' as const,
+      };
+    }
+
     return this.prisma.category.findMany({
-      where: { marketId },
-      include: { _count: { select: { products: true } } },
+      where,
+      include: {
+        _count: { select: { products: true } },
+      },
       orderBy: { name: 'asc' },
     });
   }

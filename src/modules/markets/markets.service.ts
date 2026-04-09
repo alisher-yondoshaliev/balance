@@ -2,15 +2,17 @@ import {
   Injectable,
   NotFoundException,
   ForbiddenException,
+  BadRequestException,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateMarketDto } from './dto/create-market.dto';
 import { UpdateMarketDto } from './dto/update-market.dto';
+import { GetMarketUsersQueryDto } from './dto/get-market-users-query.dto';
 import { MarketStatus, User } from '@prisma/client';
 
 @Injectable()
 export class MarketsService {
-  constructor(private prisma: PrismaService) { }
+  constructor(private prisma: PrismaService) {}
 
   // ── 1. Do'kon yaratish ─────────────────────────────
   async create(dto: CreateMarketDto, userId: string) {
@@ -45,24 +47,12 @@ export class MarketsService {
     });
   }
 
-  // ── 3. Bitta do'kon ────────────────────────────────
-  async findOne(id: string) {
-    return await this.prisma.market.findUnique({
-      where: { id },
-      include: {
-        owner: {
-          select: {
-            id: true,
-            fullName: true,
-            email: true,
-          },
-        },
-      },
-    });
-  }
-
-  // ── 3.5. Do'konning xodimlarini ko'rish ───────────
-  async findMarketUsers(marketId: string, currentUser: User) {
+  // ── 3. Do'konning xodimlarini ko'rish ────────────────
+  async findMarketUsers(
+    marketId: string,
+    currentUser: User,
+    query: GetMarketUsersQueryDto,
+  ) {
     // Market mavjudmi?
     const market = await this.prisma.market.findUnique({
       where: { id: marketId },
@@ -74,31 +64,100 @@ export class MarketsService {
     }
 
     // Access control: OWNER faqat o'z marketining xodimlarini ko'radi
-    if ((currentUser.role as any) !== 'SUPERADMIN' && market.ownerId !== currentUser.id) {
-      throw new ForbiddenException("Bu do'konning xodimlarini ko'rish huquqi yo'q");
+    if (
+      (currentUser.role as any) !== 'SUPERADMIN' &&
+      market.ownerId !== currentUser.id
+    ) {
+      throw new ForbiddenException(
+        "Bu do'konning xodimlarini ko'rish huquqi yo'q",
+      );
     }
 
-    // Shu marketga tegishli barcha userlarni qaytarish
-    const users = await this.prisma.user.findMany({
-      where: {
-        marketId: marketId,
-      },
-      select: {
-        id: true,
-        fullName: true,
-        email: true,
-        role: true,
-        status: true,
-        marketId: true,
-        phone: true,
-        createdAt: true,
-      },
-      orderBy: { createdAt: 'desc' },
-    });
+    // Pagination
+    let page = query.page ? parseInt(String(query.page), 10) : 1;
+    let limit = query.limit ? parseInt(String(query.limit), 10) : 10;
+
+    if (page < 1) page = 1;
+    if (limit < 1 || limit > 100) limit = 10;
+
+    const skip = (page - 1) * limit;
+
+    // Where clause - Filtering
+    const where: any = { marketId };
+
+    if (query.status) {
+      where.status = query.status;
+    }
+
+    if (query.role) {
+      where.role = query.role;
+    }
+
+    // Search - ism, email, telefon
+    if (query.search && query.search.trim() !== '') {
+      where.OR = [
+        {
+          fullName: {
+            contains: query.search,
+            mode: 'insensitive',
+          },
+        },
+        {
+          email: {
+            contains: query.search,
+            mode: 'insensitive',
+          },
+        },
+        {
+          phone: {
+            contains: query.search,
+            mode: 'insensitive',
+          },
+        },
+      ];
+    }
+
+    // Sorting
+    const orderBy: any = {};
+    if (query.sortBy === 'fullName') {
+      orderBy.fullName = query.order || 'asc';
+    } else {
+      orderBy.createdAt = query.order || 'desc';
+    }
+
+    // Parallel queries
+    const [users, total] = await Promise.all([
+      this.prisma.user.findMany({
+        where,
+        select: {
+          id: true,
+          fullName: true,
+          email: true,
+          role: true,
+          status: true,
+          marketId: true,
+          phone: true,
+          createdAt: true,
+        },
+        skip,
+        take: limit,
+        orderBy,
+      }),
+      this.prisma.user.count({ where }),
+    ]);
+
+    const totalPages = Math.ceil(total / limit);
 
     return {
-      items: users,
-      total: users.length,
+      data: users,
+      meta: {
+        page,
+        limit,
+        total,
+        totalPages,
+        hasNextPage: page < totalPages,
+        hasPrevPage: page > 1,
+      },
       marketName: market.name,
     };
   }

@@ -47,7 +47,16 @@ lerna-debug.log*
 .temp
 .tmp
 
-# Runtime data
+# Uploaded files - should not be in version control
+/uploads
+/uploads/
+
+# Documentation and temporary files
+*.md
+*.txt
+/docs
+*.log
+*.tmp
 pids
 *.pid
 *.seed

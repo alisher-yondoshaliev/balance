@@ -33,29 +33,40 @@ export class CategoriesController {
 
   @Get()
   @Roles(Role.SUPERADMIN, Role.OWNER, Role.ADMIN, Role.MANAGER, Role.SELLER)
-  @ApiOperation({ summary: 'Barcha kategoriyalar' })
-  @ApiQuery({ name: 'marketId', required: true })
-  findAll(@Query('marketId') marketId: string, @CurrentUser() user: User) {
-    return this.categoriesService.findAll(marketId, user);
+  @ApiOperation({ summary: 'Market kategoriyalari (search bilan)' })
+  @ApiQuery({ name: 'marketId', required: true, description: "Market ID'i" })
+  @ApiQuery({
+    name: 'search',
+    required: false,
+    description: "Kategoriya nomi bo'yicha qidirish",
+  })
+  findAll(
+    @Query('marketId') marketId: string,
+    @Query('search') search: string | undefined,
+    @CurrentUser() user: User,
+  ) {
+    return this.categoriesService.findAll(marketId, user, search);
   }
 
   @Post()
   @Roles(Role.SUPERADMIN, Role.OWNER, Role.ADMIN)
-  @ApiOperation({ summary: 'Kategoriya yaratish' })
+  @ApiOperation({ summary: 'Yangi kategoriya yaratish' })
   create(@Body() dto: CreateCategoryDto, @CurrentUser() user: User) {
     return this.categoriesService.create(dto, user);
   }
 
   @Get(':id')
   @Roles(Role.SUPERADMIN, Role.OWNER, Role.ADMIN, Role.MANAGER, Role.SELLER)
-  @ApiOperation({ summary: 'Bitta kategoriya' })
+  @ApiOperation({
+    summary: "Kategoriya ma'lumotlarini olish (mahsulotlar bilan)",
+  })
   findOne(@Param('id') id: string, @CurrentUser() user: User) {
     return this.categoriesService.findOne(id, user);
   }
 
   @Patch(':id')
   @Roles(Role.SUPERADMIN, Role.OWNER, Role.ADMIN)
-  @ApiOperation({ summary: 'Kategoriya tahrirlash' })
+  @ApiOperation({ summary: 'Kategoriyani tahrirlash (nom yoki rasm)' })
   update(
     @Param('id') id: string,
     @Body() dto: UpdateCategoryDto,
@@ -66,7 +77,7 @@ export class CategoriesController {
 
   @Delete(':id')
   @Roles(Role.SUPERADMIN, Role.OWNER, Role.ADMIN)
-  @ApiOperation({ summary: "Kategoriya o'chirish" })
+  @ApiOperation({ summary: "Kategoriyani o'chirish (mahsulotlar yo'q bo'lsa)" })
   remove(@Param('id') id: string, @CurrentUser() user: User) {
     return this.categoriesService.remove(id, user);
   }

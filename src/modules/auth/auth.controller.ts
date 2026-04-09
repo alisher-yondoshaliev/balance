@@ -31,7 +31,7 @@ import { GoogleGuard } from './guards/google.guard';
 @ApiTags('Auth')
 @Controller('auth')
 export class AuthController {
-  constructor(private authService: AuthService) { }
+  constructor(private authService: AuthService) {}
 
   @Post('send-otp')
   @ApiOperation({ summary: 'Emailga OTP yuborish (register uchun)' })
@@ -83,7 +83,7 @@ export class AuthController {
   @Get('me')
   @UseGuards(AccessTokenGuard)
   @ApiBearerAuth('access-token')
-  @ApiOperation({ summary: 'Joriy foydalanuvchining ma\'lumotlari' })
+  @ApiOperation({ summary: "Joriy foydalanuvchining ma'lumotlari" })
   @ApiResponse({
     status: 200,
     description: 'User information returned',

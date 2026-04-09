@@ -7,18 +7,20 @@ import {
   Patch,
   Post,
   UseGuards,
+  Query,
 } from '@nestjs/common';
 import {
   ApiTags,
   ApiOperation,
   ApiResponse,
   ApiBearerAuth,
+  ApiQuery,
 } from '@nestjs/swagger';
 import { MarketsService } from './markets.service';
 import { CreateMarketDto } from './dto/create-market.dto';
 import { UpdateMarketDto } from './dto/update-market.dto';
-import { MarketUserResponse } from './dto/market-users.response';
-import { MarketUsersListResponse } from './dto/market-users-list.response';
+import { GetMarketUsersQueryDto } from './dto/get-market-users-query.dto';
+import { GetMarketUsersResponse } from './dto/get-market-users-response.dto';
 import { AccessTokenGuard } from '../auth/guards/access-token.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
@@ -30,7 +32,7 @@ import { Role, User } from '@prisma/client';
 @UseGuards(AccessTokenGuard)
 @Controller('markets')
 export class MarketsController {
-  constructor(private marketsService: MarketsService) { }
+  constructor(private marketsService: MarketsService) {}
 
   @Post()
   @UseGuards(RolesGuard)
@@ -49,20 +51,17 @@ export class MarketsController {
     return this.marketsService.findMyMarkets(userId);
   }
 
-  @Get(':id')
-  @ApiOperation({ summary: "Bitta do'kon" })
-  findOne(@Param('id') id: string) {
-    return this.marketsService.findOne(id);
-  }
-
   @Get(':id/users')
   @UseGuards(RolesGuard)
   @Roles('SUPERADMIN' as any, Role.OWNER)
-  @ApiOperation({ summary: "Do'konning xodimlarini ko'rish" })
+  @ApiOperation({
+    summary:
+      "Do'konning xodimlarini ko'rish (pagination + filtering + sorting)",
+  })
   @ApiResponse({
     status: 200,
     description: "Do'konga tegishli xodimlar ro'yxati",
-    type: MarketUsersListResponse,
+    type: GetMarketUsersResponse,
   })
   @ApiResponse({
     status: 404,
@@ -72,11 +71,58 @@ export class MarketsController {
     status: 403,
     description: "Xodimlarni ko'rish huquqi yo'q",
   })
+  @ApiQuery({
+    name: 'page',
+    required: false,
+    example: 1,
+    type: Number,
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    example: 10,
+    type: Number,
+  })
+  @ApiQuery({
+    name: 'search',
+    required: false,
+    example: 'Ali',
+    type: String,
+  })
+  @ApiQuery({
+    name: 'status',
+    required: false,
+    example: 'ACTIVE',
+    type: String,
+    enum: ['ACTIVE', 'INACTIVE', 'BLOCKED'],
+  })
+  @ApiQuery({
+    name: 'role',
+    required: false,
+    example: 'SELLER',
+    type: String,
+    enum: ['ADMIN', 'MANAGER', 'SELLER'],
+  })
+  @ApiQuery({
+    name: 'sortBy',
+    required: false,
+    example: 'createdAt',
+    type: String,
+    enum: ['createdAt', 'fullName'],
+  })
+  @ApiQuery({
+    name: 'order',
+    required: false,
+    example: 'desc',
+    type: String,
+    enum: ['asc', 'desc'],
+  })
   findMarketUsers(
     @Param('id') marketId: string,
+    @Query() query: GetMarketUsersQueryDto,
     @CurrentUser() currentUser: User,
   ) {
-    return this.marketsService.findMarketUsers(marketId, currentUser);
+    return this.marketsService.findMarketUsers(marketId, currentUser, query);
   }
 
   @Patch(':id')
