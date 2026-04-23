@@ -27,19 +27,25 @@ export class RequestLoggingInterceptor implements NestInterceptor {
       this.logger.log(
         `[${method} ${url}] ===== RAW REQUEST BODY (BEFORE PIPE) =====`,
       );
-      this.logger.log(`Raw body:`, JSON.stringify(body, null, 2));
+      this.logger.log(`Raw body: ${JSON.stringify(body, null, 2)}`);
 
       // Log specific fields we care about
       if (body && typeof body === 'object') {
-        this.logger.log('Field analysis:', {
-          hasMonths: 'months' in body,
-          hasTermMonths: 'termMonths' in body,
-          months: body.months,
-          termMonths: body.termMonths,
-          downPayment: body.downPayment,
-          customerId: body.customerId,
-          productId: body.productId,
-        });
+        this.logger.log(
+          `Field analysis: ${JSON.stringify(
+            {
+              hasMonths: 'months' in body,
+              hasTermMonths: 'termMonths' in body,
+              months: body.months,
+              termMonths: body.termMonths,
+              downPayment: body.downPayment,
+              customerId: body.customerId,
+              productId: body.productId,
+            },
+            null,
+            2,
+          )}`,
+        );
       }
     }
 
